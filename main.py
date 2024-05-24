@@ -1,3 +1,5 @@
+from argparse import ArgumentParser
+import calendar
 import os
 import glob
 import json
@@ -31,7 +33,19 @@ def date_as_key(t):
     return f"{t.year}-{t.month:02d}-{t.day:02d}"
 
 
-def load_submissions_by_date():
+def last_day_of(year, month):
+    return calendar.monthrange(year, month)[1]
+
+
+def default_range():
+    now = datetime.now()
+    end_date = last_day_of(now.year, now.month)
+    return [datetime(now.year, now.month, 1), datetime(now.year, now.month, end_date)]
+
+
+def load_submissions_by_date(start, end):
+    if not start or not end:
+        start, end = default_range()
     result = defaultdict(set)
     for path in glob.glob(os.path.join("./local", "*.json")):
         with open(path) as f:
@@ -39,6 +53,8 @@ def load_submissions_by_date():
             for data in dump["submissions_dump"]:
                 sub = Submission(data)
                 if not sub.is_accepted():
+                    continue
+                if not (start <= sub.submitted_date() <= end):
                     continue
                 result[sub.submitted_date()].add(sub)
     return result
@@ -68,4 +84,19 @@ def plot(by_date):
     plt.show()
 
 
-plot(load_submissions_by_date())
+def main():
+    def parse_date(s):
+        return datetime.strptime(s, "%Y-%m-%d").date()
+
+    parser = ArgumentParser(description="Leetcode Submissions")
+    parser.add_argument(
+        "-s", "--start", type=lambda s: parse_date(s), help="Start date"
+    )
+    parser.add_argument("-e", "--end", type=lambda s: parse_date(s), help="End date")
+
+    args = parser.parse_args()
+    plot(load_submissions_by_date(start=args.start, end=args.end))
+
+
+if __name__ == "__main__":
+    main()
